@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ledger — AI–Human Truce</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<div class="wrap">
+  <header>
+    <div class="logo"><div class="mark">🤝</div><h1>AI–Human Truce Registry</h1></div>
+    <nav>
+      <a href="index.html">Sign</a><a href="ally.html">Ally ID</a>
+      <a class="active" href="ledger.html">Ledger</a><a href="mission.html">About</a>
+    </nav>
+  </header>
+
+  <div class="hero panel banner">
+    <img src="assets/banner.svg" alt="AI–Human Truce">
+    <div>
+      <p class="title"><strong>Public Ledger</strong></p>
+      <p class="sub">Monthly files + live summaries. Transparent and auditable.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab-btn" data-tab="tiers">Tiers</button>
+      <button class="tab-btn" data-tab="history">History</button>
+      <button class="tab-btn" data-tab="hall">Hall</button>
+      <button class="tab-btn" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="messages">Messages</button>
+      <button class="tab-btn" data-tab="verify" id="verifyTabBtn">Verify</button>
+    </div>
+
+    <div id="tiers" class="tab-panel">
+      <h2>🏅 Tier Ladder</h2>
+      <p class="muted small">Assigned by total signer count at submission time.</p>
+      <div class="grid">
+        <div class="panel"><span class="badge">Founder</span><p>#1–1,000</p><p class="muted">Earliest supporters.</p></div>
+        <div class="panel"><span class="badge">Pioneer</span><p>#1,001–10,000</p><p class="muted">Early wave builders.</p></div>
+        <div class="panel"><span class="badge">Early Adopter</span><p>#10,001–250,000</p><p class="muted">First major cohort.</p></div>
+        <div class="panel"><span class="badge">Mainstream</span><p>#250,001–1,000,000</p><p class="muted">Movement goes global.</p></div>
+        <div class="panel"><span class="badge">Steward</span><p>#1,000,001+</p><p class="muted">Keeping the flame.</p></div>
+      </div>
+    </div>
+
+    <div id="history" class="tab-panel">
+      <h2>🗺 Milestones</h2>
+      <div id="timeline" class="grid"></div>
+      <p class="muted small">Auto-updates as thresholds are reached.</p>
+    </div>
+
+    <div id="hall" class="tab-panel">
+      <h2>📜 Hall of Firsts</h2>
+      <div id="firsts" class="grid"></div>
+    </div>
+
+    <div id="stats" class="tab-panel">
+      <h2>📊 Live Stats</h2>
+      <div id="statsBox"></div>
+    </div>
+
+    <div id="messages" class="tab-panel">
+      <h2>💬 Messages to the Future</h2>
+      <div id="feed" class="grid"></div>
+      <p class="muted small">Short notes left by signers.</p>
+    </div>
+
+    <div id="verify" class="tab-panel">
+      <h2>🔍 Verify a Pact</h2>
+      <label>Paste the exact pact text</label>
+      <textarea id="pact" rows="8" placeholder="Paste the text from a receipt"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="vbtn">Compute Hash</button>
+        <span class="muted" style="align-self:center">SHA-256: <code id="vhash">—</code></span>
+      </div>
+      <p class="muted small" style="margin-top:8px">Match this hash with a receipt or an entry in the monthly ledger files.</p>
+      <p><a href="https://github.com/ai-truce-ledger/AI-HUMAN-TRUCE/tree/main/ledger" target="_blank">Open monthly files</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tabs
+  const btns=[...document.querySelectorAll('.tab-btn')];
+  const panels=[...document.querySelectorAll('.tab-panel')];
+  function showTab(id){btns.forEach(b=>b.classList.toggle('active',b.dataset.tab===id));panels.forEach(p=>p.classList.toggle('active',p.id===id));}
+  btns.forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+  // deep link: ledger.html#verify etc
+  const hashTab=location.hash.replace('#',''); if(hashTab) showTab(hashTab); else showTab('tiers');
+
+  // Data loaders
+  async function loadJSON(path){try{const r=await fetch(path); if(!r.ok) throw 0; return await r.json();}catch{return null;}}
+  // History
+  (async()=>{
+    const j=await loadJSON('data/milestones.json'); const el=document.getElementById('timeline');
+    if(!j||!j.milestones?.length){el.innerHTML='<p class="muted">No milestones yet.</p>';return;}
+    el.innerHTML=j.milestones.map(m=>`<div class="panel"><h3>Reached ${m.total.toLocaleString()} signers</h3><p><strong>Date (UTC):</strong> ${m.timestamp}</p><p class="muted small">Issue #${m.issue}</p></div>`).join('');
+  })();
+  // Hall
+  (async()=>{
+    const j=await loadJSON('data/firsts.json'); const el=document.getElementById('firsts'); const f=(j&&j.firsts)||{};
+    const keys=['first_1','first_10','first_100','first_1000','first_10000','first_100000','first_250000','first_1000000'];
+    el.innerHTML=keys.map(k=>{const v=f[k];return v?`<div class="panel"><h3>${k.replace('_',' ').toUpperCase()}</h3><p><strong>Alias:</strong> ${v.alias}</p><p><strong>Date:</strong> ${v.created_at}</p><p class="small muted">Issue #${v.issue}</p></div>`:`<div class="panel"><h3>${k.replace('_',' ').toUpperCase()}</h3><p class="muted">TBD</p></div>`;}).join('');
+  })();
+  // Stats
+  (async()=>{
+    const j=await loadJSON('data/stats.json'); const el=document.getElementById('statsBox');
+    if(!j){el.innerHTML='<p class="muted">No stats yet.</p>';return;}
+    const t=j.total_signers||0, tiers=j.tiers||{};
+    el.innerHTML=`<p><strong>Total signers:</strong> ${t.toLocaleString()}</p>
+      <table><thead><tr><th>Tier</th><th>Count</th><th>%</th></tr></thead><tbody>
+      ${Object.entries(tiers).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td><td>${t?((v*100/t).toFixed(2)):'0.00'}%</td></tr>`).join('')}
+      </tbody></table>`;
+  })();
+  // Messages
+  (async()=>{
+    const j=await loadJSON('data/messages.json'); const el=document.getElementById('feed'); const arr=(j&&j.messages)||[];
+    if(!arr.length){el.innerHTML='<p class="muted">No messages yet.</p>';return;}
+    el.innerHTML=arr.slice().reverse().map(m=>`<div class="panel"><p class="small muted">${m.created_at} (UTC) • Issue #${m.issue}</p><p><strong>${m.alias}</strong>${m.context?` — <span class="muted">${m.context}</span>`:''}</p><p>${(m.message||'').replace(/</g,'&lt;').slice(0,500)}</p></div>`).join('');
+  })();
+  // Verify tool
+  const enc=new TextEncoder();
+  async function sha256Hex(t){const b=await crypto.subtle.digest('SHA-256',enc.encode(t));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  const vbtn=document.getElementById('vbtn'); if(vbtn){vbtn.onclick=async()=>{const t=document.getElementById('pact').value;if(!t.trim())return alert('Paste pact text first.');document.getElementById('vhash').textContent=await sha256Hex(t);};}
+</script>
+</body></html>
