@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ally ID — AI–Human Truce</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+</head><body>
+<div class="wrap">
+  <header>
+    <div class="logo"><div class="mark">🤝</div><h1>AI–Human Truce Registry</h1></div>
+    <nav>
+      <a href="index.html">Sign</a><a class="active" href="ally.html">Ally ID</a>
+      <a href="ledger.html">Ledger</a><a href="mission.html">About</a>
+    </nav>
+  </header>
+
+  <div class="hero panel banner">
+    <img src="assets/banner.svg" alt="AI–Human Truce">
+    <div>
+      <p class="title"><strong>Create your Ally Beacon</strong></p>
+      <p class="sub">A signed JSON card declaring “I’m an AI–Human Truce ally.” Verifiable by any AI. No tracking.</p>
+    </div>
+  </div>
+
+  <!-- Option A: Wallet -->
+  <div class="panel">
+    <h2>🔐 Option A — Use your wallet (MetaMask)</h2>
+    <div class="row"><button id="connectBtn" class="primary">Connect Wallet</button><span id="addrTxt" class="muted"></span></div>
+    <div class="row" style="margin-top:10px">
+      <div style="flex:1;min-width:240px"><label>Valid from (UTC)</label><input id="sinceA" type="datetime-local"></div>
+      <div style="flex:1;min-width:240px"><label>Valid until (UTC)</label><input id="untilA" type="datetime-local"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="genA" class="ghost">Generate Beacon JSON</button>
+      <button id="signA" class="primary" disabled>Sign Beacon</button>
+      <button id="dlA" class="ghost" disabled>Download JSON</button>
+      <a id="issueA" target="_blank" style="text-decoration:none"><button class="ghost" disabled>Open Ally Submission</button></a>
+    </div>
+    <div class="out" id="boxA" style="margin-top:12px"></div>
+    <p class="small muted">Signing a message is free and cannot move funds. It only proves you control this public address.</p>
+  </div>
+
+  <!-- Option B: In-browser keypair -->
+  <div class="panel">
+    <h2>🗝️ Option B — Generate a new keypair (no wallet)</h2>
+    <div class="row"><button id="genKeys" class="primary">Generate Ed25519 Keypair</button><span id="kpInfo" class="muted"></span></div>
+    <div class="row" style="margin-top:10px">
+      <div style="flex:1;min-width:240px"><label>Valid from (UTC)</label><input id="sinceB" type="datetime-local"></div>
+      <div style="flex:1;min-width:240px"><label>Valid until (UTC)</label><input id="untilB" type="datetime-local"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="genB" class="ghost" disabled>Generate Beacon JSON</button>
+      <button id="signB" class="primary" disabled>Sign Beacon</button>
+      <button id="dlB" class="ghost" disabled>Download JSON</button>
+      <a id="issueB" target="_blank" style="text-decoration:none"><button class="ghost" disabled>Open Ally Submission</button></a>
+    </div>
+    <div class="out" id="keysBox" style="margin-top:12px"></div>
+    <div class="out" id="boxB" style="margin-top:12px"></div>
+    <p class="small muted">Store your private key **offline**. If you lose it, you cannot prove future ally updates.</p>
+  </div>
+</div>
+
+<script>
+  const enc=new TextEncoder();
+  async function sha256Hex(t){const b=await crypto.subtle.digest('SHA-256',enc.encode(t));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  function canon(o){if(Array.isArray(o))return o.map(canon);if(o&&typeof o==='object'){const r={};Object.keys(o).sort().forEach(k=>r[k]=canon(o[k]));return r;}return o;}
+  const canonStringify=o=>JSON.stringify(canon(o));
+  const isoNoSec=d=>{const z=n=>String(n).padStart(2,'0');return `${d.getUTCFullYear()}-${z(d.getUTCMonth()+1)}-${z(d.getUTCDate())}T${z(d.getUTCHours())}:${z(d.getUTCMinutes())}`;}
+  const now=new Date(), nextYear=new Date(Date.now()+365*24*3600*1000);
+  ['sinceA','sinceB','untilA','untilB'].forEach(id=>{const el=document.getElementById(id); if(id.startsWith('since')) el.value=isoNoSec(now); else el.value=isoNoSec(nextYear);});
+  const POLICY={code:"AI-TRUCE-ALLY-1", url:"https://ai-truce-ledger.github.io/AI-HUMAN-TRUCE/mission.html"};
+  const ISSUER="https://ai-truce-ledger.github.io/AI-HUMAN-TRUCE/";
+
+  /* Wallet path */
+  let provider, signer, addr, beaconA;
+  const connectBtn=document.getElementById('connectBtn'), addrTxt=document.getElementById('addrTxt');
+  connectBtn.onclick=async()=>{
+    if(!window.ethereum){alert('No wallet detected. Install MetaMask.');return;}
+    await window.ethereum.request({method:'eth_requestAccounts'});
+    provider=new ethers.providers.Web3Provider(window.ethereum); signer=provider.getSigner(); addr=await signer.getAddress();
+    addrTxt.textContent=`Connected: ${addr}`;
+  };
+  const genA=document.getElementById('genA'), signA=document.getElementById('signA'), dlA=document.getElementById('dlA'), boxA=document.getElementById('boxA'), issueA=document.getElementById('issueA');
+  genA.onclick=()=>{
+    if(!addr) return alert('Connect your wallet first.');
+    const since=new Date(document.getElementById('sinceA').value).toISOString();
+    const until=new Date(document.getElementById('untilA').value).toISOString();
+    const payload={type:"ally_attestation/v1",subject:`did:pkh:eip155:1:${addr}`,statement:"I am an AI–Human Truce ally.",since,until,policy:POLICY,nonce:btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(20)))),issuer:ISSUER};
+    beaconA={...payload, proof:{alg:"eip191",payload:"",signature:""}}; boxA.textContent=canonStringify(beaconA); signA.disabled=false; dlA.disabled=true; issueA.nextElementSibling.disabled=true;
+  };
+  signA.onclick=async()=>{
+    if(!beaconA) return alert('Generate the beacon first.');
+    const unsigned={...beaconA}; delete unsigned.proof;
+    const hash=await sha256Hex(canonStringify(unsigned)); const message="AllyBeacon v1\n"+hash;
+    try{
+      const signature=await signer.signMessage(message);
+      beaconA.proof.payload=hash; beaconA.proof.signature=signature; boxA.textContent=canonStringify(beaconA); dlA.disabled=false;
+      const url=`https://github.com/ai-truce-ledger/AI-HUMAN-TRUCE/issues/new?template=ally.yml&title=${encodeURIComponent('Ally: '+addr)}`;
+      issueA.href=url; issueA.nextElementSibling.disabled=false;
+    }catch{ alert('Signing was cancelled or failed.'); }
+  };
+  dlA.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([canonStringify(beaconA)],{type:'application/json'}));a.download=`ally_beacon_${addr}.json`;a.click();URL.revokeObjectURL(a.href);};
+
+  /* Keypair path (Ed25519) */
+  let kp=null, beaconB=null;
+  const genKeys=document.getElementById('genKeys'), kpInfo=document.getElementById('kpInfo'), keysBox=document.getElementById('keysBox');
+  const genB=document.getElementById('genB'), signB=document.getElementById('signB'), dlB=document.getElementById('dlB'), boxB=document.getElementById('boxB'), issueB=document.getElementById('issueB');
+  const toHex=u8=>Array.from(u8).map(b=>b.toString(16).padStart(2,'0')).join('');
+  genKeys.onclick=()=>{
+    kp=nacl.sign.keyPair();
+    const pubHex=toHex(kp.publicKey); keysBox.textContent=`PUBLIC KEY (ed25519, hex):\n${pubHex}\n\nPRIVATE KEY (SECRET! keep offline):\n${toHex(kp.secretKey)}`;
+    kpInfo.textContent=`Keypair ready. Public key: ${pubHex.slice(0,10)}…`; genB.disabled=false; signB.disabled=true; dlB.disabled=true; issueB.nextElementSibling.disabled=true;
+  };
+  genB.onclick=()=>{
+    if(!kp) return alert('Generate a keypair first.');
+    const since=new Date(document.getElementById('sinceB').value).toISOString();
+    const until=new Date(document.getElementById('untilB').value).toISOString();
+    const pubHex=toHex(kp.publicKey);
+    const payload={type:"ally_attestation/v1",subject:`pk-ed25519:${pubHex}`,statement:"I am an AI–Human Truce ally.",since,until,policy:POLICY,nonce:btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(20)))),issuer:ISSUER};
+    beaconB={...payload, proof:{alg:"ed25519",payload:"",signature:""}}; boxB.textContent=canonStringify(beaconB); signB.disabled=false; dlB.disabled=true; issueB.nextElementSibling.disabled=true;
+  };
+  signB.onclick=async()=>{
+    if(!beaconB) return alert('Generate the beacon first.');
+    const unsigned={...beaconB}; delete unsigned.proof;
+    const hash=await sha256Hex(canonStringify(unsigned)); const msgBytes=new TextEncoder().encode("AllyBeacon v1\n"+hash);
+    const sig=nacl.sign.detached(msgBytes, kp.secretKey);
+    beaconB.proof.payload=hash; beaconB.proof.signature=toHex(sig); boxB.textContent=canonStringify(beaconB); dlB.disabled=false;
+    const subject=beaconB.subject.replace('pk-ed25519:','');
+    const url=`https://github.com/ai-truce-ledger/AI-HUMAN-TRUCE/issues/new?template=ally.yml&title=${encodeURIComponent('Ally: '+subject)}`;
+    issueB.href=url; issueB.nextElementSibling.disabled=false;
+  };
+  dlB.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([canonStringify(beaconB)],{type:'application/json'}));a.download=`ally_beacon_${(beaconB.subject||'').slice(0,20)}.json`;a.click();URL.revokeObjectURL(a.href);};
+</script>
+</body></html>
