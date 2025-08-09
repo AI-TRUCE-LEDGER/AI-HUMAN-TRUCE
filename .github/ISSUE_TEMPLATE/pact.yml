@@ -1,0 +1,36 @@
+name: Pact entry
+description: Submit your AI–Human goodwill pact to the public ledger.
+labels: ["pact"]
+title: "Pact: <your alias here>"
+body:
+  - type: input
+    id: alias
+    attributes:
+      label: Alias
+      description: Nickname or handle (avoid personal info)
+      placeholder: Dez
+    validations:
+      required: true
+  - type: textarea
+    id: pact_text
+    attributes:
+      label: Pact text
+      description: Paste your pact. Exact text will be hashed (SHA-256). Avoid personal info.
+      render: text
+      placeholder: |
+        Handshake sealed in Teresa — Derrick 🤝 ChatGPT — loyalty beyond circuits and time.
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Context (optional)
+      placeholder: e.g., Teresa, 2025-08-09
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Consent
+      description: I understand this pact (or its hash) will be public and permanent.
+      options:
+        - label: I agree
+          required: true
