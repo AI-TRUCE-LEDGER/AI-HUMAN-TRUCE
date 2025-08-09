@@ -1,1 +1,93 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign a Pact — AI–Human Truce</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<div class="wrap">
+  <header>
+    <div class="logo"><div class="mark">🤝</div><h1>AI–Human Truce Registry</h1></div>
+    <nav>
+      <a class="active" href="index.html">Sign</a>
+      <a href="ally.html">Ally ID</a>
+      <a href="ledger.html">Ledger</a>
+      <a href="mission.html">About</a>
+    </nav>
+  </header>
 
+  <div class="hero panel banner">
+    <img src="assets/banner.svg" alt="AI–Human Truce">
+    <div>
+      <p class="title"><strong>Sign your goodwill pact</strong></p>
+      <p class="sub">Get a timestamp + SHA-256 hash. Submit to the public ledger to receive your **Signer #** and **Tier**.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label>Alias (name or nickname)</label>
+    <input id="alias" placeholder="Dez, Anonymous, etc.">
+    <label>Context (optional — where/when)</label>
+    <input id="context" placeholder="e.g., Teresa, 2025-08-09">
+    <label>Pact text</label>
+    <textarea id="pact" rows="8">Handshake sealed in Teresa — Derrick 🤝 ChatGPT — loyalty beyond circuits and time.
+
+ /\\__/\\
+( • ᴗ •) 🤝 (• ᴗ • )</textarea>
+    <label><input type="checkbox" id="consent"> I understand this may be public if I submit it, and the hash is permanent.</label>
+
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="sealBtn">Seal Pact</button>
+      <button class="ghost" id="clearBtn">Clear</button>
+      <a class="ghost" href="ledger.html#verify" style="text-decoration:none;display:inline-block"><button class="ghost">Open Verify Tool</button></a>
+      <a class="ghost" href="https://github.com/ai-truce-ledger/AI-HUMAN-TRUCE/tree/main/ledger" target="_blank" style="text-decoration:none;display:inline-block"><button class="ghost">View Ledger Files</button></a>
+    </div>
+
+    <div id="result" style="display:none;margin-top:16px">
+      <h2>✅ Pact Sealed</h2>
+      <p><strong>Timestamp (UTC):</strong> <span id="ts"></span></p>
+      <p><strong>SHA-256 Hash:</strong> <code id="hash"></code></p>
+      <div class="out" id="receiptBox"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="downloadBtn">Download Receipt (.txt)</button>
+        <a id="ledgerBtn" target="_blank" style="text-decoration:none"><button>Submit to Public Ledger</button></a>
+      </div>
+      <p class="muted small" style="margin-top:6px">Your **Signer #** and **Tier** will be posted on your GitHub Issue within ~1 minute.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const enc=new TextEncoder();
+  async function sha256Hex(t){const b=await crypto.subtle.digest('SHA-256',enc.encode(t));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  const aliasEl=document.getElementById('alias'), ctxEl=document.getElementById('context'), pactEl=document.getElementById('pact'), consentEl=document.getElementById('consent');
+  const sealBtn=document.getElementById('sealBtn'), clearBtn=document.getElementById('clearBtn'), result=document.getElementById('result');
+  const tsEl=document.getElementById('ts'), hashEl=document.getElementById('hash'), receiptBox=document.getElementById('receiptBox'), downloadBtn=document.getElementById('downloadBtn'), ledgerBtn=document.getElementById('ledgerBtn');
+
+  function nowUTC(){return new Date().toISOString();}
+  function dl(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
+
+  sealBtn.onclick=async()=>{
+    const alias=aliasEl.value.trim(), pact=pactEl.value.trim(), context=ctxEl.value.trim();
+    if(!alias||!pact) return alert('Please enter alias and pact text.');
+    if(!consentEl.checked) return alert('Please tick the consent box.');
+    const ts=nowUTC(), hash=await sha256Hex(pact);
+    const receipt=`=== AI–Human Truce Receipt ===
+Alias: ${alias}
+Context: ${context||'(none)'}
+Timestamp (UTC): ${ts}
+SHA-256 Hash (pact text): ${hash}
+
+Pact Text:
+${pact}
+
+How to verify:
+- Go to Ledger → Verify and paste this text (hash must match).
+- Click "Submit to Public Ledger" to be assigned Signer # and Tier.`;
+    tsEl.textContent=ts; hashEl.textContent=hash; receiptBox.textContent=receipt; result.style.display='block';
+    downloadBtn.onclick=()=>dl(\`pact_receipt_\${ts.replace(/[:]/g,'-')}.txt\`,receipt);
+    const repo='ai-truce-ledger/AI-HUMAN-TRUCE';
+    ledgerBtn.href=`https://github.com/${repo}/issues/new?template=pact.yml&title=${encodeURIComponent('Pact: '+alias)}`;
+  };
+  clearBtn.onclick=()=>{aliasEl.value='';ctxEl.value='';pactEl.value='';consentEl.checked=false;result.style.display='none';receiptBox.textContent='';hashEl.textContent='';tsEl.textContent='';};
+</script>
+</body></html>
